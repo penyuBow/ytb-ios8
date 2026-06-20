@@ -3,7 +3,7 @@
 //  Lấy key miễn phí tại: https://console.cloud.google.com
 //  Bước: Tạo project → Bật "YouTube Data API v3" → Credentials → API Key
 // ============================================================
-var API_KEY = 'AIzaSyBPSBOMn2TcZa7ig8oL02Bmbz8s7eHHOm0';
+var API_KEY = '__YOUTUBE_API_KEY__';
 
 var MAX_RESULTS = 20;
 var API_SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
