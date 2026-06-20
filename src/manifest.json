@@ -1,0 +1,17 @@
+{
+  "name": "YTube - YouTube nhẹ",
+  "short_name": "YTube",
+  "description": "Xem YouTube nhẹ hơn trên thiết bị iOS cũ",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f0f",
+  "theme_color": "#0f0f0f",
+  "icons": [
+    {
+      "src": "icons/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

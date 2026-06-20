@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="YTube">
+  <meta name="theme-color" content="#0f0f0f">
+  <title>YTube</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="apple-touch-icon" href="icons/icon.png">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===== MÀN HÌNH TÌM KIẾM ===== -->
+    <div id="screen-search" class="screen active">
+      <header class="header">
+        <span class="logo">&#9654; YTube</span>
+      </header>
+
+      <!-- Banner cảnh báo nếu chưa có API Key -->
+      <div id="api-banner" class="api-banner hidden">
+        &#9888; Chưa có API Key. Xem hướng dẫn trong <code>app.js</code>
+      </div>
+
+      <div class="search-bar">
+        <input type="search" id="search-input"
+               placeholder="Tìm kiếm video..."
+               autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false">
+        <button id="search-btn" onclick="doSearch()">Tìm</button>
+      </div>
+
+      <div id="results" class="results">
+        <!-- Màn hình chào -->
+        <div class="welcome">
+          <div class="welcome-icon">&#9654;</div>
+          <div class="welcome-text">Tìm kiếm video YouTube</div>
+          <div class="welcome-sub">Nhẹ hơn, nhanh hơn safari</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MÀN HÌNH PLAYER ===== -->
+    <div id="screen-player" class="screen">
+      <div class="player-header">
+        <button id="back-btn" onclick="goBack()">&#8592; Quay l&#7841;i</button>
+      </div>
+
+      <!-- Container giữ tỉ lệ 16:9 -->
+      <div class="player-wrap">
+        <iframe id="yt-player"
+                src="about:blank"
+                frameborder="0"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+        </iframe>
+      </div>
+
+      <div id="video-info" class="video-info"></div>
+    </div>
+
+  </div><!-- /#app -->
+
+  <script src="app.js"></script>
+</body>
+</html>
