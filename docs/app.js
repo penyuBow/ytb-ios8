@@ -152,13 +152,35 @@ function onResultClick(e) {
 }
 
 // ============================================================
+//  TÍNH KÍCH THƯỚC PLAYER — fix iOS cũ không hỗ trợ padding-bottom trick
+//  YouTube iframe cần width/height attribute chính xác, nếu không render sai size
+// ============================================================
+function resizePlayer() {
+  var wrap = document.querySelector('.player-wrap');
+  var w = wrap ? wrap.offsetWidth : window.innerWidth;
+  var h = Math.round(w * 9 / 16);
+  ytPlayer.setAttribute('width', w);
+  ytPlayer.setAttribute('height', h);
+  ytPlayer.style.width  = w + 'px';
+  ytPlayer.style.height = h + 'px';
+}
+
+// ============================================================
 //  PHÁT VIDEO
 // ============================================================
 function playVideo(videoId, title, channel) {
+  // Chuyển màn hình trước để .player-wrap có offsetWidth thực
+  screenSearch.classList.remove('active');
+  screenPlayer.classList.add('active');
+  window.scrollTo(0, 0);
+
+  // Set kích thước iframe khớp với container (fix old iOS)
+  resizePlayer();
+
   // Build embed URL:
-  // - autoplay=1     : tự phát (iOS cần user gesture - click đã là gesture)
-  // - playsinline=1  : không bắt fullscreen trên iOS cũ
-  // - rel=0          : không hiện video liên quan của kênh khác
+  // - autoplay=1       : tự phát (click là user gesture đủ điều kiện)
+  // - playsinline=1    : không bắt fullscreen trên iOS cũ
+  // - rel=0            : không hiện video liên quan kênh khác
   // - modestbranding=1 : giảm logo YouTube
   var embedUrl = 'https://www.youtube.com/embed/' + videoId
     + '?autoplay=1'
@@ -171,12 +193,13 @@ function playVideo(videoId, title, channel) {
   videoInfoDiv.innerHTML =
     '<h2>' + escHtml(title) + '</h2>' +
     '<div class="video-channel">' + escHtml(channel) + '</div>';
-
-  // Chuyển màn hình
-  screenSearch.classList.remove('active');
-  screenPlayer.classList.add('active');
-  window.scrollTo(0, 0);
 }
+
+// Resize lại khi xoay màn hình
+window.addEventListener('orientationchange', function () {
+  // Đợi xoay xong mới tính
+  setTimeout(resizePlayer, 300);
+});
 
 // ============================================================
 //  QUAY LẠI TÌM KIẾM
