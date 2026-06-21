@@ -35,14 +35,26 @@
       color: #555; font-size: 12px; background: #111;
     }
 
-    /* ===== PIPED IFRAME PLAYER =====
-       Piped = open-source YouTube frontend, dùng HTML5 <video> thuần.
-       Không có YouTube's proprietary GPU player → không có rotation bug trên iOS cũ. */
-    #player-wrap { display: none; width: 100%; background: #000; }
-    #player-wrap iframe {
-      display: block; border: 0;
-      width: 100%;
-      height: 56.25vw; /* 9:16 responsive — vw supported iOS 6+ */
+    /* ===== LOADING ===== */
+    #loading { display: none; padding: 46px 20px; text-align: center; background: #000; }
+    .spinner {
+      width: 36px; height: 36px; margin: 0 auto 14px;
+      border: 3px solid #333; border-top-color: #ff0000;
+      border-radius: 50%; -webkit-border-radius: 50%;
+      -webkit-animation: spin .8s linear infinite;
+      animation: spin .8s linear infinite;
+    }
+    @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: #888; font-size: 13px; }
+
+    /* ===== NATIVE HTML5 VIDEO =====
+       Thẻ <video> thuần là thứ DUY NHẤT chạy mượt trên iOS 8/9.
+       Không dùng iframe embed (Piped/YouTube) vì các trang đó cần
+       JavaScript hiện đại mà Safari iOS cũ không chạy được → kẹt loading. */
+    #video-wrap { display: none; width: 100%; background: #000; }
+    #video-wrap video {
+      display: block; width: 100%; height: auto; background: #000;
     }
 
     /* ===== FALLBACK ===== */
@@ -61,13 +73,15 @@
     .video-channel { color: #aaa; font-size: 13px; }
 
     .err { color: #ff6666; padding: 40px 20px; text-align: center; }
+    .err-msg { color: #ff8888; font-size: 13px; text-align: center; padding: 0 16px 14px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
 <div class="header">
   <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
-  <span class="ver">v9</span>
+  <span class="ver">v10</span>
 </div>
 
 <!-- Poster thumbnail -->
@@ -75,10 +89,16 @@
   <img id="thumb" src="" alt="">
   <div class="play-circle">&#9654;</div>
 </div>
-<p class="poster-note">Nh&#7845;n &#7843;nh &#273;&#7875; xem video</p>
+<p class="poster-note" id="poster-note">Nh&#7845;n &#7843;nh &#273;&#7875; xem video</p>
 
-<!-- Piped embed iframe — HTML5 player, không dùng YouTube's proprietary player -->
-<div id="player-wrap"></div>
+<!-- Loading spinner -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loading-text">&#272;ang t&#7843;i video...</p>
+</div>
+
+<!-- Native HTML5 video — tạo bằng JS sau khi có stream URL -->
+<div id="video-wrap"></div>
 
 <div id="video-info" class="video-info"></div>
 
@@ -87,8 +107,27 @@
   &#9654; M&#7903; tr&#234;n YouTube (d&#7921; ph&#242;ng)
 </a>
 <p class="yt-note">N&#7871;u player kh&#244;ng t&#7843;i, nh&#7845;n n&#250;t n&#224;y</p>
+<p id="err-msg" class="err-msg hidden"></p>
 
 <script>
+  // Danh sách Invidious instances — sẽ thử lần lượt nếu cái trước fail.
+  // Dùng endpoint /latest_version?id=...&itag=...&local=true:
+  //   - local=true => stream được proxy QUA instance (tránh lỗi 403
+  //     do googlevideo khoá theo IP), và trả về MP4 thuần.
+  //   - itag 18 = 360p mp4 (audio+video), itag 22 = 720p mp4.
+  //   - <video> nạp trực tiếp URL này, KHÔNG cần gọi API/CORS.
+  var INSTANCES = [
+    'https://yewtu.be',
+    'https://inv.nadeko.net',
+    'https://iv.ggtyler.dev',
+    'https://invidious.nerdvpn.de',
+    'https://invidious.jing.rocks',
+    'https://invidious.privacyredirect.com'
+  ];
+  var ITAGS = ['18', '22']; // 360p trước (nhẹ, dễ phát trên máy cũ), rồi 720p
+
+  var PER_TRY_TIMEOUT = 9000; // ms — mỗi ứng viên chờ tối đa 9s rồi bỏ qua
+
   var params = {};
   try {
     var hash = window.location.hash.slice(1);
@@ -105,6 +144,12 @@
   var title   = params.t || '';
   var channel = params.c || '';
 
+  // Danh sách URL ứng viên (instance x itag)
+  var candidates = [];
+  var candIdx = 0;
+  var tryTimer = null;
+  var videoEl = null;
+
   if (!videoId) {
     document.getElementById('poster').innerHTML =
       '<div class="err">Kh&#244;ng t&#236;m th&#7845;y video. ' +
@@ -120,31 +165,87 @@
     document.getElementById('yt-btn').href =
       'https://m.youtube.com/watch?v=' + videoId;
 
-    document.getElementById('poster').onclick = loadPlayer;
+    // Build danh sách ứng viên: ưu tiên 360p ở tất cả instance, rồi 720p.
+    for (var t = 0; t < ITAGS.length; t++) {
+      for (var s = 0; s < INSTANCES.length; s++) {
+        candidates.push(
+          INSTANCES[s] + '/latest_version?id=' + encodeURIComponent(videoId) +
+          '&itag=' + ITAGS[t] + '&local=true'
+        );
+      }
+    }
+
+    document.getElementById('poster').onclick = startLoad;
   }
 
-  function loadPlayer() {
+  function startLoad() {
     document.getElementById('poster').style.display = 'none';
-    document.getElementById('poster').nextElementSibling.style.display = 'none'; // note
+    document.getElementById('poster-note').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
 
-    var wrap = document.getElementById('player-wrap');
-    wrap.style.display = 'block';
+    // Tạo 1 thẻ video tái sử dụng cho mọi lần thử
+    var wrap = document.getElementById('video-wrap');
+    videoEl = document.createElement('video');
+    videoEl.setAttribute('controls', 'controls');
+    videoEl.setAttribute('playsinline', '');          // iOS 10+
+    videoEl.setAttribute('webkit-playsinline', '');    // iOS 8/9
+    videoEl.setAttribute('preload', 'auto');
+    videoEl.setAttribute('poster',
+      'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg');
 
-    // Dùng Piped embed thay vì YouTube embed:
-    // - Piped là open-source YouTube frontend
-    // - Dùng HTML5 <video> element, không phải YouTube's proprietary player
-    // - Không có rotation/sizing bug trên iOS cũ
-    // - Embed URL format: piped.video/embed/VIDEO_ID
-    var iframe = document.createElement('iframe');
-    iframe.setAttribute('frameborder',            '0');
-    iframe.setAttribute('allowfullscreen',        'allowfullscreen');
-    iframe.setAttribute('webkit-allowfullscreen', '');
-    iframe.setAttribute('allow',                  'autoplay; fullscreen; picture-in-picture');
+    videoEl.onerror = function () { nextCandidate(); };
+    // Khi đã sẵn sàng phát => coi như thành công
+    videoEl.oncanplay   = onPlayable;
+    videoEl.onloadeddata = onPlayable;
 
-    wrap.appendChild(iframe);
+    wrap.appendChild(videoEl);
 
-    // Thử piped.video trước, nếu fail (offline) thì có fallback button
-    iframe.src = 'https://piped.video/embed/' + videoId + '?autoplay=1';
+    candIdx = 0;
+    tryCandidate();
+  }
+
+  function tryCandidate() {
+    if (candIdx >= candidates.length) { fail(); return; }
+
+    clearTimeout(tryTimer);
+    tryTimer = setTimeout(nextCandidate, PER_TRY_TIMEOUT);
+
+    var url = candidates[candIdx];
+    try {
+      videoEl.src = url;
+      videoEl.load();
+    } catch (e) {
+      nextCandidate();
+    }
+  }
+
+  function nextCandidate() {
+    clearTimeout(tryTimer);
+    candIdx++;
+    tryCandidate();
+  }
+
+  var done = false;
+  function onPlayable() {
+    if (done) return;
+    done = true;
+    clearTimeout(tryTimer);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('video-wrap').style.display = 'block';
+
+    try { videoEl.play(); } catch (e) {}
+  }
+
+  function fail() {
+    clearTimeout(tryTimer);
+    document.getElementById('loading').style.display = 'none';
+    var msg = document.getElementById('err-msg');
+    msg.innerHTML =
+      'Kh&#244;ng t&#7843;i &#273;&#432;&#7907;c video qua m&#225;y ch&#7911; ' +
+      'd&#7921; ph&#242;ng. H&#227;y nh&#7845;n n&#250;t &#273;&#7887; ' +
+      'm&#7903; tr&#234;n YouTube.';
+    msg.className = 'err-msg';
   }
 
   function esc(s) {
