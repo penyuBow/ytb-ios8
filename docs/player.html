@@ -2,7 +2,6 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <!-- Không có maximum-scale hay user-scalable=no để iOS video controls hoạt động đúng -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -12,12 +11,12 @@
     html, body { background: #000; }
 
     .header {
-      background: #111111;
+      background: #111;
       padding: 10px 14px;
       border-bottom: 1px solid #222;
     }
     .back-btn {
-      color: #ffffff;
+      color: #fff;
       background: none;
       border: none;
       font-size: 16px;
@@ -26,13 +25,44 @@
       padding: 6px 0;
       cursor: pointer;
     }
-    .back-btn:active { color: #aaaaaa; }
+    .back-btn:active { color: #aaa; }
 
-    /* iframe được JS size đúng chiều cao */
+    /* Poster thumbnail + play button */
+    #poster {
+      width: 100%;
+      background: #111;
+      position: relative;
+      cursor: pointer;
+      display: block;
+    }
+    #poster img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .play-circle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 72px;
+      height: 72px;
+      margin-top: -36px;
+      margin-left: -36px;
+      background: rgba(200, 0, 0, 0.88);
+      border-radius: 50%;
+      -webkit-border-radius: 50%;
+      text-align: center;
+      line-height: 72px;
+      font-size: 30px;
+      color: #fff;
+    }
+
+    /* iframe wrapper — ẩn cho đến khi user tap */
     #player-wrap {
       width: 100%;
       background: #000;
       overflow: hidden;
+      display: none;
     }
     #player-wrap iframe {
       display: block;
@@ -41,10 +71,10 @@
 
     .video-info {
       padding: 14px 16px;
-      background: #111111;
+      background: #111;
     }
     .video-title {
-      color: #ffffff;
+      color: #fff;
       font-size: 15px;
       font-weight: 600;
       font-family: -apple-system, 'Helvetica Neue', sans-serif;
@@ -52,10 +82,25 @@
       margin-bottom: 6px;
     }
     .video-channel {
-      color: #aaaaaa;
+      color: #aaa;
       font-size: 13px;
       font-family: -apple-system, 'Helvetica Neue', sans-serif;
     }
+
+    /* Fallback link khi iframe không chạy được */
+    #fallback {
+      display: block;
+      text-align: center;
+      padding: 14px 16px;
+      background: #111;
+      border-top: 1px solid #222;
+      color: #888;
+      font-size: 13px;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+      text-decoration: none;
+    }
+    #fallback span { color: #ff6666; }
+
     .err {
       color: #ff6666;
       padding: 40px 20px;
@@ -69,8 +114,16 @@
     <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
   </div>
 
+  <div id="poster">
+    <img id="thumb" src="" alt="">
+    <div class="play-circle">&#9654;</div>
+  </div>
+
   <div id="player-wrap"></div>
   <div id="video-info" class="video-info"></div>
+  <a id="fallback" href="" target="_blank">
+    Kh&#244;ng xem &#273;&#432;&#7907;c? <span>M&#7903; tr&#7921;c ti&#7871;p tr&#234;n YouTube &#8599;</span>
+  </a>
 
   <script>
     // Đọc params từ URL hash: player.html#v=ID&t=Title&c=Channel
@@ -91,44 +144,58 @@
     var channel = params.c || '';
 
     if (!videoId) {
-      document.getElementById('player-wrap').innerHTML =
-        '<div class="err">Kh&#244;ng t&#236;m th&#7845;y video. <a href="index.html" style="color:#ff6666">Quay l&#7841;i</a></div>';
+      document.getElementById('poster').innerHTML =
+        '<div class="err">Kh&#244;ng t&#236;m th&#7845;y video. ' +
+        '<a href="index.html" style="color:#ff6666">Quay l&#7841;i</a></div>';
     } else {
-      // Hiển thị tiêu đề
+      // Thumbnail từ YouTube (không cần API)
+      document.getElementById('thumb').src =
+        'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg';
+
+      // Tiêu đề và kênh
       document.getElementById('video-info').innerHTML =
         '<div class="video-title">' + esc(title) + '</div>' +
         '<div class="video-channel">' + esc(channel) + '</div>';
 
-      // Tính kích thước iframe theo viewport thực tế
-      var w = window.innerWidth;
+      // Link dự phòng
+      document.getElementById('fallback').href =
+        'https://m.youtube.com/watch?v=' + videoId;
+
+      // Tap poster → load iframe
+      document.getElementById('poster').onclick = loadPlayer;
+    }
+
+    function loadPlayer() {
+      document.getElementById('poster').onclick = null;
+
+      var w = window.innerWidth || 320;
       var h = Math.round(w * 9 / 16);
 
       var wrap = document.getElementById('player-wrap');
-      wrap.style.height = h + 'px';
+      wrap.style.height  = h + 'px';
+      wrap.style.display = 'block';
+      document.getElementById('poster').style.display = 'none';
 
-      // Tạo iframe với đúng kích thước TRƯỚC khi set src
-      // webkit-playsinline cần thiết cho iOS 9 inline video (không phải URL param)
       var iframe = document.createElement('iframe');
       iframe.setAttribute('width',                  String(w));
       iframe.setAttribute('height',                 String(h));
       iframe.setAttribute('frameborder',            '0');
       iframe.setAttribute('allowfullscreen',        'allowfullscreen');
       iframe.setAttribute('webkit-allowfullscreen', '');
-      iframe.setAttribute('playsinline',            '');
-      iframe.setAttribute('webkit-playsinline',     '');
-      iframe.setAttribute('allow',                  'autoplay; fullscreen; picture-in-picture; encrypted-media');
       iframe.style.display = 'block';
       iframe.style.width   = w + 'px';
       iframe.style.height  = h + 'px';
 
       wrap.appendChild(iframe);
 
-      // Set src SAU KHI iframe đã mount vào DOM — YouTube đọc kích thước lúc này
+      // KHÔNG dùng playsinline:
+      // - iOS 8-9: video tự mở native iOS fullscreen player (đúng cách, không bị xoay)
+      // - iOS 10+: play inline trong iframe bình thường
       iframe.src = 'https://www.youtube.com/embed/' + videoId
         + '?autoplay=1'
-        + '&playsinline=1'
         + '&rel=0'
-        + '&modestbranding=1';
+        + '&modestbranding=1'
+        + '&fs=1';
     }
 
     function esc(s) {
