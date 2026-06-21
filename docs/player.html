@@ -11,162 +11,236 @@
     html, body { background: #000; font-family: -apple-system, 'Helvetica Neue', sans-serif; }
 
     .header {
-      background: #111;
-      padding: 10px 14px;
-      border-bottom: 1px solid #222;
-      overflow: hidden;
+      background: #111; padding: 10px 14px;
+      border-bottom: 1px solid #222; overflow: hidden;
     }
     .back-btn {
-      color: #fff; background: none; border: none;
-      font-size: 16px; -webkit-appearance: none;
-      padding: 6px 0; cursor: pointer; float: left;
+      color: #fff; background: none; border: none; font-size: 16px;
+      -webkit-appearance: none; padding: 6px 0; cursor: pointer; float: left;
     }
     .back-btn:active { color: #aaa; }
     .ver { color: #444; font-size: 11px; float: right; line-height: 32px; }
 
-    /* Poster thumbnail + play button */
+    /* ===== POSTER ===== */
     #poster { width: 100%; background: #111; position: relative; cursor: pointer; }
     #poster img { display: block; width: 100%; height: auto; }
     .play-circle {
       position: absolute; top: 50%; left: 50%;
-      width: 72px; height: 72px;
-      margin-top: -36px; margin-left: -36px;
-      background: rgba(200, 0, 0, 0.88);
+      width: 72px; height: 72px; margin-top: -36px; margin-left: -36px;
+      background: rgba(200,0,0,0.88); border-radius: 50%; -webkit-border-radius: 50%;
+      text-align: center; line-height: 72px; font-size: 30px; color: #fff;
+    }
+
+    /* ===== LOADING ===== */
+    #loading {
+      display: none; padding: 50px 20px; text-align: center; background: #000;
+    }
+    .spinner {
+      width: 36px; height: 36px; margin: 0 auto 14px;
+      border: 3px solid #333; border-top-color: #ff0000;
       border-radius: 50%; -webkit-border-radius: 50%;
-      text-align: center; line-height: 72px;
-      font-size: 30px; color: #fff;
+      -webkit-animation: spin .8s linear infinite;
+      animation: spin .8s linear infinite;
+    }
+    @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: #888; font-size: 14px; }
+
+    /* ===== NATIVE VIDEO ===== */
+    #video-wrap { display: none; width: 100%; background: #000; }
+    #video-wrap video {
+      display: block; width: 100%; height: auto;
+      background: #000;
     }
 
-    /* Nút mở YouTube — luôn hiển thị, to, dễ bấm */
-    .yt-btn {
-      display: block;
-      margin: 14px 16px 4px;
-      padding: 14px;
-      background: #cc0000;
-      color: #fff;
-      text-align: center;
-      border-radius: 8px; -webkit-border-radius: 8px;
-      font-size: 16px; font-weight: 600;
-      text-decoration: none;
-      letter-spacing: 0.2px;
-    }
-    .yt-btn:active { background: #aa0000; }
-    .yt-note {
-      color: #666; font-size: 12px;
-      text-align: center; padding: 4px 16px 14px;
-    }
-
-    /* iframe wrap */
-    #player-wrap { width: 100%; background: #000; display: none; }
-    #player-wrap iframe {
-      display: block; border: 0;
-      width: 100%; height: 56.25vw;
-      /* Force GPU layer — fix WebKit rotation bug trên iOS cũ */
-      -webkit-transform: translateZ(0);
-      transform: translateZ(0);
-    }
-
-    .divider { border: none; border-top: 1px solid #222; margin: 0; }
-
+    /* ===== INFO ===== */
     .video-info { padding: 14px 16px; background: #111; }
     .video-title { color: #fff; font-size: 15px; font-weight: 600; line-height: 1.45; margin-bottom: 6px; }
     .video-channel { color: #aaa; font-size: 13px; }
 
-    .err { color: #ff6666; padding: 40px 20px; text-align: center; }
+    /* ===== FALLBACK ===== */
+    .yt-btn {
+      display: block; margin: 14px 16px 4px; padding: 14px;
+      background: #cc0000; color: #fff; text-align: center;
+      border-radius: 8px; -webkit-border-radius: 8px;
+      font-size: 16px; font-weight: 600; text-decoration: none;
+    }
+    .yt-btn:active { background: #aa0000; }
+    .yt-note { color: #555; font-size: 12px; text-align: center; padding: 4px 16px 20px; }
+
+    .err-msg { color: #ff8888; font-size: 13px; text-align: center; padding: 0 16px 14px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
-    <span class="ver">v7</span>
-  </div>
 
-  <div id="poster">
-    <img id="thumb" src="" alt="">
-    <div class="play-circle">&#9654;</div>
-  </div>
+<div class="header">
+  <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
+  <span class="ver">v8</span>
+</div>
 
-  <div id="player-wrap"></div>
+<!-- Poster (ảnh thumbnail + nút play) -->
+<div id="poster">
+  <img id="thumb" src="" alt="">
+  <div class="play-circle">&#9654;</div>
+</div>
 
-  <div id="video-info" class="video-info"></div>
+<!-- Loading spinner -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>&#272;ang t&#7843;i video...</p>
+</div>
 
-  <!-- Nút mở m.youtube.com — luôn có, nhẹ hơn youtube.com nhiều -->
-  <a id="yt-btn" class="yt-btn" href="" target="_self">
-    &#9654; Xem video tr&#234;n YouTube
-  </a>
-  <p class="yt-note">M&#7903; m.youtube.com trong trang n&#224;y (nh&#7865; h&#417;n)</p>
+<!-- Native HTML5 video — không phải iframe YouTube -->
+<div id="video-wrap">
+  <!-- video element được tạo bằng JS sau khi có stream URL -->
+</div>
 
-  <script>
-    var params = {};
-    try {
-      var hash = window.location.hash.slice(1);
-      var parts = hash.split('&');
-      for (var i = 0; i < parts.length; i++) {
-        var kv = parts[i].split('=');
-        if (kv.length >= 2) {
-          params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join('='));
+<div id="video-info" class="video-info"></div>
+
+<!-- Nút dự phòng — luôn hiển thị -->
+<a id="yt-btn" class="yt-btn" href="" target="_self">
+  &#9654; Xem tr&#234;n YouTube (d&#7921; ph&#242;ng)
+</a>
+<p class="yt-note">N&#7871;u video kh&#244;ng t&#7843;i &#273;&#432;&#7907;c, nh&#7845;n n&#250;t tr&#234;n</p>
+<p id="err-msg" class="err-msg hidden"></p>
+
+<script>
+  // Danh sách Invidious instances — thử lần lượt nếu instance đầu fail
+  var INSTANCES = [
+    'https://yewtu.be',
+    'https://inv.nadeko.net',
+    'https://invidious.fdn.fr'
+  ];
+
+  var params = {};
+  try {
+    var hash = window.location.hash.slice(1);
+    var parts = hash.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split('=');
+      if (kv.length >= 2) {
+        params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join('='));
+      }
+    }
+  } catch (e) {}
+
+  var videoId = params.v || '';
+  var title   = params.t || '';
+  var channel = params.c || '';
+
+  if (!videoId) {
+    document.getElementById('poster').innerHTML =
+      '<p style="color:#ff6666;padding:40px 20px;text-align:center">' +
+      'Kh&#244;ng t&#236;m th&#7845;y video. ' +
+      '<a href="index.html" style="color:#ff6666">Quay l&#7841;i</a></p>';
+  } else {
+    document.getElementById('thumb').src =
+      'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg';
+
+    document.getElementById('video-info').innerHTML =
+      '<div class="video-title">' + esc(title) + '</div>' +
+      '<div class="video-channel">' + esc(channel) + '</div>';
+
+    document.getElementById('yt-btn').href =
+      'https://m.youtube.com/watch?v=' + videoId;
+
+    document.getElementById('poster').onclick = startLoad;
+  }
+
+  function startLoad() {
+    document.getElementById('poster').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    fetchStream(0);
+  }
+
+  // Gọi Invidious API để lấy direct stream URL, thử từng instance
+  function fetchStream(idx) {
+    if (idx >= INSTANCES.length) {
+      showError('Không lấy được stream. Dùng nút dự phòng bên dưới.');
+      return;
+    }
+
+    var url = INSTANCES[idx] + '/api/v1/videos/' + videoId + '?fields=formatStreams';
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.timeout = 8000;
+
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var stream = pickStream(data.formatStreams || []);
+          if (stream) {
+            playNative(stream.url);
+          } else {
+            fetchStream(idx + 1);
+          }
+        } catch (e) {
+          fetchStream(idx + 1);
+        }
+      } else {
+        fetchStream(idx + 1);
+      }
+    };
+    xhr.ontimeout = function () { fetchStream(idx + 1); };
+    xhr.onerror   = function () { fetchStream(idx + 1); };
+    xhr.send();
+  }
+
+  // Chọn stream tốt nhất: ưu tiên mp4, chất lượng 360p-480p cho iOS cũ
+  function pickStream(streams) {
+    var order = ['480p', '360p', '720p', '240p', '144p'];
+    for (var q = 0; q < order.length; q++) {
+      for (var s = 0; s < streams.length; s++) {
+        var st = streams[s];
+        if (st.qualityLabel === order[q] && st.container === 'mp4') {
+          return st;
         }
       }
-    } catch (e) {}
-
-    var videoId = params.v || '';
-    var title   = params.t || '';
-    var channel = params.c || '';
-
-    if (!videoId) {
-      document.getElementById('poster').innerHTML =
-        '<div class="err">Kh&#244;ng t&#236;m th&#7845;y video. ' +
-        '<a href="index.html" style="color:#ff6666">Quay l&#7841;i</a></div>';
-    } else {
-      document.getElementById('thumb').src =
-        'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg';
-
-      document.getElementById('video-info').innerHTML =
-        '<div class="video-title">' + esc(title) + '</div>' +
-        '<div class="video-channel">' + esc(channel) + '</div>';
-
-      // Nút mở m.youtube.com (nhẹ, chạy tốt trên iOS cũ)
-      document.getElementById('yt-btn').href =
-        'https://m.youtube.com/watch?v=' + videoId;
-
-      // Tap thumbnail → thử phát inline bằng iframe
-      document.getElementById('poster').onclick = loadPlayer;
     }
-
-    function loadPlayer() {
-      document.getElementById('poster').onclick = null;
-      document.getElementById('poster').style.display = 'none';
-
-      var w = window.innerWidth || 320;
-      var h = Math.round(w * 9 / 16);
-
-      var wrap = document.getElementById('player-wrap');
-      wrap.style.display = 'block';
-
-      var iframe = document.createElement('iframe');
-      // Set cả attribute (YouTube đọc) lẫn CSS (browser layout)
-      iframe.setAttribute('width',                  String(w));
-      iframe.setAttribute('height',                 String(h));
-      iframe.setAttribute('frameborder',            '0');
-      iframe.setAttribute('allowfullscreen',        'allowfullscreen');
-      iframe.setAttribute('webkit-allowfullscreen', '');
-      iframe.setAttribute('allow',                  'autoplay; fullscreen');
-
-      wrap.appendChild(iframe);
-
-      iframe.src = 'https://www.youtube.com/embed/' + videoId
-        + '?autoplay=1'
-        + '&rel=0'
-        + '&fs=1';
+    // Fallback: bất kỳ mp4 nào
+    for (var s2 = 0; s2 < streams.length; s2++) {
+      if (streams[s2].container === 'mp4') return streams[s2];
     }
+    return null;
+  }
 
-    function esc(s) {
-      return String(s || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-  </script>
+  // Phát video bằng native <video> — không dùng iframe YouTube
+  function playNative(streamUrl) {
+    document.getElementById('loading').style.display = 'none';
+
+    var wrap = document.getElementById('video-wrap');
+    wrap.style.display = 'block';
+
+    var video = document.createElement('video');
+    video.setAttribute('controls',          'controls');
+    video.setAttribute('playsinline',       'playsinline');       // iOS 10+ inline
+    video.setAttribute('webkit-playsinline','webkit-playsinline');// iOS 9 inline
+    video.setAttribute('preload',           'auto');
+    video.style.cssText = 'display:block;width:100%;height:auto;background:#000;';
+
+    wrap.appendChild(video);
+    video.src = streamUrl;
+    video.load();
+
+    // Thử autoplay — có thể bị block bởi iOS nhưng video vẫn hiển thị controls
+    try { video.play(); } catch (e) {}
+  }
+
+  function showError(msg) {
+    document.getElementById('loading').style.display = 'none';
+    var el = document.getElementById('err-msg');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+</script>
 </body>
 </html>
