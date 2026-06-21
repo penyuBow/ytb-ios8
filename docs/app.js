@@ -153,26 +153,41 @@ function onResultClick(e) {
 
 // ============================================================
 //  TÍNH KÍCH THƯỚC PLAYER
-//  Dùng window.innerWidth thay vì offsetWidth vì offsetWidth có thể
-//  trả về 0 nếu element vừa được show chưa kịp layout
+//
+//  Vấn đề trên iOS cũ: YouTube embed có minimum render width ~480px.
+//  Nếu iframe nhỏ hơn, player render ở size mặc định rồi bị clip → chỉ thấy 1 góc.
+//
+//  Giải pháp: render iframe ở 480×270 (size chuẩn), sau đó scale xuống
+//  bằng CSS transform để vừa màn hình. Cách này đảm bảo YouTube
+//  render đầy đủ trước khi bị scale.
 // ============================================================
-function resizePlayer() {
-  // window.innerWidth luôn chính xác, không phụ thuộc vào layout timing
-  var w = window.innerWidth;
-  var h = Math.round(w * 9 / 16);
+var PLAYER_W = 480; // kích thước YouTube render chuẩn
+var PLAYER_H = 270;
 
-  // Set cả container lẫn iframe để không bị clipping
+function resizePlayer() {
+  var screenW = window.innerWidth;
+  var scale   = screenW / PLAYER_W;
+  var visH    = Math.round(PLAYER_H * scale); // chiều cao thực tế sau scale
+
   var wrap = document.querySelector('.player-wrap');
   if (wrap) {
-    wrap.style.width  = w + 'px';
-    wrap.style.height = h + 'px';
+    wrap.style.width    = screenW + 'px';
+    wrap.style.height   = visH + 'px';
+    wrap.style.overflow = 'hidden';
   }
 
-  // Set cả attribute (cho YouTube player đọc) lẫn style (cho CSS)
-  ytPlayer.setAttribute('width',  String(w));
-  ytPlayer.setAttribute('height', String(h));
-  ytPlayer.style.width  = w + 'px';
-  ytPlayer.style.height = h + 'px';
+  // Đặt iframe ở size chuẩn 480×270, rồi scale về kích thước màn hình
+  ytPlayer.setAttribute('width',  String(PLAYER_W));
+  ytPlayer.setAttribute('height', String(PLAYER_H));
+  ytPlayer.style.width  = PLAYER_W + 'px';
+  ytPlayer.style.height = PLAYER_H + 'px';
+
+  // -webkit-transform cho iOS cũ (iOS 8/9 cần prefix)
+  var scaleStr = 'scale(' + scale + ')';
+  ytPlayer.style['-webkit-transform']        = scaleStr;
+  ytPlayer.style['-webkit-transform-origin'] = '0 0';
+  ytPlayer.style.transform                   = scaleStr;
+  ytPlayer.style.transformOrigin             = '0 0';
 }
 
 // ============================================================

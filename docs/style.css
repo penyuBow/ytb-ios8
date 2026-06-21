@@ -50,6 +50,12 @@ html, body {
   color: #ff0000;
   letter-spacing: -0.3px;
 }
+.version {
+  font-size: 11px;
+  color: #444;
+  margin-left: 6px;
+  vertical-align: middle;
+}
 
 /* =========================================
    API BANNER
