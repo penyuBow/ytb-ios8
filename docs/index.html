@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-title" content="YTube">
   <meta name="theme-color" content="#0f0f0f">
   <title>YTube</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <link rel="apple-touch-icon" href="icons/icon.png">
   <link rel="manifest" href="manifest.json">
 </head>
@@ -19,7 +19,7 @@
     <div id="screen-search" class="screen active">
       <header class="header">
         <span class="logo">&#9654; YTube</span>
-        <span class="version">v4</span>
+        <span class="version">v5</span>
       </header>
 
       <!-- Banner cảnh báo nếu chưa có API Key -->
@@ -51,21 +51,14 @@
         <button id="back-btn" onclick="goBack()">&#8592; Quay l&#7841;i</button>
       </div>
 
-      <!-- Container giữ tỉ lệ 16:9 -->
-      <div class="player-wrap">
-        <iframe id="yt-player"
-                src="about:blank"
-                frameborder="0"
-                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen>
-        </iframe>
-      </div>
+      <!-- Container — iframe được tạo động bằng JS mỗi lần play -->
+      <div class="player-wrap"></div>
 
       <div id="video-info" class="video-info"></div>
     </div>
 
   </div><!-- /#app -->
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@ var searchBtn    = document.getElementById('search-btn');
 var resultsDiv   = document.getElementById('results');
 var screenSearch = document.getElementById('screen-search');
 var screenPlayer = document.getElementById('screen-player');
-var ytPlayer     = document.getElementById('yt-player');
+var ytPlayer     = null; // tạo động mỗi lần play
 var videoInfoDiv = document.getElementById('video-info');
 var apiBanner    = document.getElementById('api-banner');
 
@@ -152,55 +152,19 @@ function onResultClick(e) {
 }
 
 // ============================================================
-//  TÍNH KÍCH THƯỚC PLAYER
-//
-//  Vấn đề trên iOS cũ: YouTube embed có minimum render width ~480px.
-//  Nếu iframe nhỏ hơn, player render ở size mặc định rồi bị clip → chỉ thấy 1 góc.
-//
-//  Giải pháp: render iframe ở 480×270 (size chuẩn), sau đó scale xuống
-//  bằng CSS transform để vừa màn hình. Cách này đảm bảo YouTube
-//  render đầy đủ trước khi bị scale.
-// ============================================================
-var PLAYER_W = 480; // kích thước YouTube render chuẩn
-var PLAYER_H = 270;
-
-function resizePlayer() {
-  var screenW = window.innerWidth;
-  var scale   = screenW / PLAYER_W;
-  var visH    = Math.round(PLAYER_H * scale); // chiều cao thực tế sau scale
-
-  var wrap = document.querySelector('.player-wrap');
-  if (wrap) {
-    wrap.style.width    = screenW + 'px';
-    wrap.style.height   = visH + 'px';
-    wrap.style.overflow = 'hidden';
-  }
-
-  // Đặt iframe ở size chuẩn 480×270, rồi scale về kích thước màn hình
-  ytPlayer.setAttribute('width',  String(PLAYER_W));
-  ytPlayer.setAttribute('height', String(PLAYER_H));
-  ytPlayer.style.width  = PLAYER_W + 'px';
-  ytPlayer.style.height = PLAYER_H + 'px';
-
-  // -webkit-transform cho iOS cũ (iOS 8/9 cần prefix)
-  var scaleStr = 'scale(' + scale + ')';
-  ytPlayer.style['-webkit-transform']        = scaleStr;
-  ytPlayer.style['-webkit-transform-origin'] = '0 0';
-  ytPlayer.style.transform                   = scaleStr;
-  ytPlayer.style.transformOrigin             = '0 0';
-}
-
-// ============================================================
 //  PHÁT VIDEO
+//
+//  Tạo iframe MỚI mỗi lần play — không reuse iframe cũ.
+//  Lý do: YouTube player khởi tạo size khi iframe mount vào DOM.
+//  Nếu reuse, size đã bị lock từ lần trước và không thay đổi được.
+//
+//  Thêm webkit-playsinline cho iOS 9 (cần attribute, không chỉ URL param).
 // ============================================================
 function playVideo(videoId, title, channel) {
-  var embedUrl = 'https://www.youtube.com/embed/' + videoId
-    + '?autoplay=1'
-    + '&playsinline=1'  // không bắt fullscreen trên iOS cũ
-    + '&rel=0'
-    + '&modestbranding=1';
+  var screenW  = window.innerWidth;
+  var screenH  = Math.round(screenW * 9 / 16);
 
-  // Hiển thị info ngay
+  // Hiển thị info
   videoInfoDiv.innerHTML =
     '<h2>' + escHtml(title) + '</h2>' +
     '<div class="video-channel">' + escHtml(channel) + '</div>';
@@ -210,25 +174,47 @@ function playVideo(videoId, title, channel) {
   screenPlayer.classList.add('active');
   window.scrollTo(0, 0);
 
-  // Đợi browser layout xong (50ms) rồi mới set kích thước và load video
-  // Nếu set src ngay lập tức, YouTube player có thể load ở size mặc định (sai)
-  setTimeout(function () {
-    resizePlayer();
-    ytPlayer.src = embedUrl;
-  }, 50);
-}
+  // Cấu hình container
+  var wrap = document.querySelector('.player-wrap');
+  wrap.style.width    = screenW + 'px';
+  wrap.style.height   = screenH + 'px';
+  wrap.style.overflow = 'hidden';
 
-// Resize lại khi xoay màn hình (orientationchange xảy ra trước khi innerWidth cập nhật)
-window.addEventListener('orientationchange', function () {
-  setTimeout(resizePlayer, 400);
-});
+  // Tạo iframe mới với đúng kích thước từ đầu
+  var iframe = document.createElement('iframe');
+  iframe.setAttribute('width',               String(screenW));
+  iframe.setAttribute('height',              String(screenH));
+  iframe.setAttribute('frameborder',         '0');
+  iframe.setAttribute('allowfullscreen',     'allowfullscreen');
+  iframe.setAttribute('webkit-allowfullscreen', '');  // iOS cũ cần attribute này
+  iframe.setAttribute('playsinline',         '');     // HTML attribute
+  iframe.setAttribute('webkit-playsinline', '');      // iOS 9 inline video
+  iframe.style.display = 'block';
+  iframe.style.width   = screenW + 'px';
+  iframe.style.height  = screenH + 'px';
+  iframe.style.border  = 'none';
+
+  // Xóa iframe cũ rồi gắn iframe mới
+  wrap.innerHTML = '';
+  wrap.appendChild(iframe);
+  ytPlayer = iframe;
+
+  // Set src SAU KHI iframe đã mount vào DOM với kích thước đúng
+  iframe.src = 'https://www.youtube.com/embed/' + videoId
+    + '?autoplay=1'
+    + '&playsinline=1'
+    + '&rel=0'
+    + '&modestbranding=1';
+}
 
 // ============================================================
 //  QUAY LẠI TÌM KIẾM
 // ============================================================
 function goBack() {
-  // Dừng video bằng cách xóa src
-  ytPlayer.src = 'about:blank';
+  // Xóa hẳn iframe khỏi DOM để dừng video và giải phóng bộ nhớ
+  var wrap = document.querySelector('.player-wrap');
+  if (wrap) wrap.innerHTML = '';
+  ytPlayer = null;
 
   screenPlayer.classList.remove('active');
   screenSearch.classList.add('active');
