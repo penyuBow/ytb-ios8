@@ -33,7 +33,6 @@
       background: #111;
       position: relative;
       cursor: pointer;
-      display: block;
     }
     #poster img {
       display: block;
@@ -57,16 +56,17 @@
       color: #fff;
     }
 
-    /* iframe wrapper — ẩn cho đến khi user tap */
+    /* iframe wrap — CSS sizing only, không JS can thiệp */
     #player-wrap {
       width: 100%;
       background: #000;
-      overflow: hidden;
       display: none;
     }
     #player-wrap iframe {
       display: block;
-      border: none;
+      border: 0;
+      width: 100%;
+      height: 56.25vw; /* 9/16 * 100vw — iOS 6+ hỗ trợ vw */
     }
 
     .video-info {
@@ -87,7 +87,6 @@
       font-family: -apple-system, 'Helvetica Neue', sans-serif;
     }
 
-    /* Fallback link khi iframe không chạy được */
     #fallback {
       display: block;
       text-align: center;
@@ -126,7 +125,6 @@
   </a>
 
   <script>
-    // Đọc params từ URL hash: player.html#v=ID&t=Title&c=Channel
     var params = {};
     try {
       var hash = window.location.hash.slice(1);
@@ -148,53 +146,41 @@
         '<div class="err">Kh&#244;ng t&#236;m th&#7845;y video. ' +
         '<a href="index.html" style="color:#ff6666">Quay l&#7841;i</a></div>';
     } else {
-      // Thumbnail từ YouTube (không cần API)
       document.getElementById('thumb').src =
         'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg';
 
-      // Tiêu đề và kênh
       document.getElementById('video-info').innerHTML =
         '<div class="video-title">' + esc(title) + '</div>' +
         '<div class="video-channel">' + esc(channel) + '</div>';
 
-      // Link dự phòng
       document.getElementById('fallback').href =
         'https://m.youtube.com/watch?v=' + videoId;
 
-      // Tap poster → load iframe
       document.getElementById('poster').onclick = loadPlayer;
     }
 
     function loadPlayer() {
       document.getElementById('poster').onclick = null;
-
-      var w = window.innerWidth || 320;
-      var h = Math.round(w * 9 / 16);
-
-      var wrap = document.getElementById('player-wrap');
-      wrap.style.height  = h + 'px';
-      wrap.style.display = 'block';
       document.getElementById('poster').style.display = 'none';
 
+      var wrap = document.getElementById('player-wrap');
+      wrap.style.display = 'block';
+
+      // Kích thước chỉ qua CSS (56.25vw) — không set pixel bằng JS
+      // Tránh YouTube player override kích thước JS-set trên iOS cũ
       var iframe = document.createElement('iframe');
-      iframe.setAttribute('width',                  String(w));
-      iframe.setAttribute('height',                 String(h));
       iframe.setAttribute('frameborder',            '0');
       iframe.setAttribute('allowfullscreen',        'allowfullscreen');
       iframe.setAttribute('webkit-allowfullscreen', '');
-      iframe.style.display = 'block';
-      iframe.style.width   = w + 'px';
-      iframe.style.height  = h + 'px';
+      iframe.setAttribute('allow',                  'autoplay; fullscreen');
 
       wrap.appendChild(iframe);
 
-      // KHÔNG dùng playsinline:
-      // - iOS 8-9: video tự mở native iOS fullscreen player (đúng cách, không bị xoay)
-      // - iOS 10+: play inline trong iframe bình thường
-      iframe.src = 'https://www.youtube.com/embed/' + videoId
+      // Dùng youtube-nocookie.com: player đơn giản hơn, ít JS nội bộ hơn
+      // Không dùng playsinline: iOS 8-10 mở native fullscreen player (đúng cách)
+      iframe.src = 'https://www.youtube-nocookie.com/embed/' + videoId
         + '?autoplay=1'
         + '&rel=0'
-        + '&modestbranding=1'
         + '&fs=1';
     }
 
