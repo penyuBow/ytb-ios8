@@ -152,15 +152,25 @@ function onResultClick(e) {
 }
 
 // ============================================================
-//  TÍNH KÍCH THƯỚC PLAYER — fix iOS cũ không hỗ trợ padding-bottom trick
-//  YouTube iframe cần width/height attribute chính xác, nếu không render sai size
+//  TÍNH KÍCH THƯỚC PLAYER
+//  Dùng window.innerWidth thay vì offsetWidth vì offsetWidth có thể
+//  trả về 0 nếu element vừa được show chưa kịp layout
 // ============================================================
 function resizePlayer() {
-  var wrap = document.querySelector('.player-wrap');
-  var w = wrap ? wrap.offsetWidth : window.innerWidth;
+  // window.innerWidth luôn chính xác, không phụ thuộc vào layout timing
+  var w = window.innerWidth;
   var h = Math.round(w * 9 / 16);
-  ytPlayer.setAttribute('width', w);
-  ytPlayer.setAttribute('height', h);
+
+  // Set cả container lẫn iframe để không bị clipping
+  var wrap = document.querySelector('.player-wrap');
+  if (wrap) {
+    wrap.style.width  = w + 'px';
+    wrap.style.height = h + 'px';
+  }
+
+  // Set cả attribute (cho YouTube player đọc) lẫn style (cho CSS)
+  ytPlayer.setAttribute('width',  String(w));
+  ytPlayer.setAttribute('height', String(h));
   ytPlayer.style.width  = w + 'px';
   ytPlayer.style.height = h + 'px';
 }
@@ -169,36 +179,33 @@ function resizePlayer() {
 //  PHÁT VIDEO
 // ============================================================
 function playVideo(videoId, title, channel) {
-  // Chuyển màn hình trước để .player-wrap có offsetWidth thực
+  var embedUrl = 'https://www.youtube.com/embed/' + videoId
+    + '?autoplay=1'
+    + '&playsinline=1'  // không bắt fullscreen trên iOS cũ
+    + '&rel=0'
+    + '&modestbranding=1';
+
+  // Hiển thị info ngay
+  videoInfoDiv.innerHTML =
+    '<h2>' + escHtml(title) + '</h2>' +
+    '<div class="video-channel">' + escHtml(channel) + '</div>';
+
+  // Chuyển màn hình
   screenSearch.classList.remove('active');
   screenPlayer.classList.add('active');
   window.scrollTo(0, 0);
 
-  // Set kích thước iframe khớp với container (fix old iOS)
-  resizePlayer();
-
-  // Build embed URL:
-  // - autoplay=1       : tự phát (click là user gesture đủ điều kiện)
-  // - playsinline=1    : không bắt fullscreen trên iOS cũ
-  // - rel=0            : không hiện video liên quan kênh khác
-  // - modestbranding=1 : giảm logo YouTube
-  var embedUrl = 'https://www.youtube.com/embed/' + videoId
-    + '?autoplay=1'
-    + '&playsinline=1'
-    + '&rel=0'
-    + '&modestbranding=1';
-
-  ytPlayer.src = embedUrl;
-
-  videoInfoDiv.innerHTML =
-    '<h2>' + escHtml(title) + '</h2>' +
-    '<div class="video-channel">' + escHtml(channel) + '</div>';
+  // Đợi browser layout xong (50ms) rồi mới set kích thước và load video
+  // Nếu set src ngay lập tức, YouTube player có thể load ở size mặc định (sai)
+  setTimeout(function () {
+    resizePlayer();
+    ytPlayer.src = embedUrl;
+  }, 50);
 }
 
-// Resize lại khi xoay màn hình
+// Resize lại khi xoay màn hình (orientationchange xảy ra trước khi innerWidth cập nhật)
 window.addEventListener('orientationchange', function () {
-  // Đợi xoay xong mới tính
-  setTimeout(resizePlayer, 300);
+  setTimeout(resizePlayer, 400);
 });
 
 // ============================================================
