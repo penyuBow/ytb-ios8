@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <!-- Không có maximum-scale hay user-scalable=no để iOS video controls hoạt động đúng -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>YTube Player</title>
+  <style>
+    * { margin: 0; padding: 0; -webkit-box-sizing: border-box; box-sizing: border-box; }
+    html, body { background: #000; }
+
+    .header {
+      background: #111111;
+      padding: 10px 14px;
+      border-bottom: 1px solid #222;
+    }
+    .back-btn {
+      color: #ffffff;
+      background: none;
+      border: none;
+      font-size: 16px;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+      -webkit-appearance: none;
+      padding: 6px 0;
+      cursor: pointer;
+    }
+    .back-btn:active { color: #aaaaaa; }
+
+    /* iframe được JS size đúng chiều cao */
+    #player-wrap {
+      width: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    #player-wrap iframe {
+      display: block;
+      border: none;
+    }
+
+    .video-info {
+      padding: 14px 16px;
+      background: #111111;
+    }
+    .video-title {
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+      line-height: 1.45;
+      margin-bottom: 6px;
+    }
+    .video-channel {
+      color: #aaaaaa;
+      font-size: 13px;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    }
+    .err {
+      color: #ff6666;
+      padding: 40px 20px;
+      text-align: center;
+      font-family: -apple-system, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
+  </div>
+
+  <div id="player-wrap"></div>
+  <div id="video-info" class="video-info"></div>
+
+  <script>
+    // Đọc params từ URL hash: player.html#v=ID&t=Title&c=Channel
+    var params = {};
+    try {
+      var hash = window.location.hash.slice(1);
+      var parts = hash.split('&');
+      for (var i = 0; i < parts.length; i++) {
+        var kv = parts[i].split('=');
+        if (kv.length >= 2) {
+          params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join('='));
+        }
+      }
+    } catch (e) {}
+
+    var videoId = params.v || '';
+    var title   = params.t || '';
+    var channel = params.c || '';
+
+    if (!videoId) {
+      document.getElementById('player-wrap').innerHTML =
+        '<div class="err">Kh&#244;ng t&#236;m th&#7845;y video. <a href="index.html" style="color:#ff6666">Quay l&#7841;i</a></div>';
+    } else {
+      // Hiển thị tiêu đề
+      document.getElementById('video-info').innerHTML =
+        '<div class="video-title">' + esc(title) + '</div>' +
+        '<div class="video-channel">' + esc(channel) + '</div>';
+
+      // Tính kích thước iframe theo viewport thực tế
+      var w = window.innerWidth;
+      var h = Math.round(w * 9 / 16);
+
+      var wrap = document.getElementById('player-wrap');
+      wrap.style.height = h + 'px';
+
+      // Tạo iframe với đúng kích thước TRƯỚC khi set src
+      // webkit-playsinline cần thiết cho iOS 9 inline video (không phải URL param)
+      var iframe = document.createElement('iframe');
+      iframe.setAttribute('width',                  String(w));
+      iframe.setAttribute('height',                 String(h));
+      iframe.setAttribute('frameborder',            '0');
+      iframe.setAttribute('allowfullscreen',        'allowfullscreen');
+      iframe.setAttribute('webkit-allowfullscreen', '');
+      iframe.setAttribute('playsinline',            '');
+      iframe.setAttribute('webkit-playsinline',     '');
+      iframe.setAttribute('allow',                  'autoplay; fullscreen; picture-in-picture; encrypted-media');
+      iframe.style.display = 'block';
+      iframe.style.width   = w + 'px';
+      iframe.style.height  = h + 'px';
+
+      wrap.appendChild(iframe);
+
+      // Set src SAU KHI iframe đã mount vào DOM — YouTube đọc kích thước lúc này
+      iframe.src = 'https://www.youtube.com/embed/' + videoId
+        + '?autoplay=1'
+        + '&playsinline=1'
+        + '&rel=0'
+        + '&modestbranding=1';
+    }
+
+    function esc(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

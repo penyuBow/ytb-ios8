@@ -11,14 +11,9 @@ var API_SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
 // ============================================================
 //  DOM refs
 // ============================================================
-var searchInput  = document.getElementById('search-input');
-var searchBtn    = document.getElementById('search-btn');
-var resultsDiv   = document.getElementById('results');
-var screenSearch = document.getElementById('screen-search');
-var screenPlayer = document.getElementById('screen-player');
-var ytPlayer     = null; // tạo động mỗi lần play
-var videoInfoDiv = document.getElementById('video-info');
-var apiBanner    = document.getElementById('api-banner');
+var searchInput = document.getElementById('search-input');
+var resultsDiv  = document.getElementById('results');
+var apiBanner   = document.getElementById('api-banner');
 
 // ============================================================
 //  Khởi tạo
@@ -28,10 +23,19 @@ var apiBanner    = document.getElementById('api-banner');
     apiBanner.classList.remove('hidden');
   }
 
+  // Khôi phục từ khóa tìm kiếm cuối (khi quay lại từ player.html)
+  try {
+    var saved = sessionStorage.getItem('ytb_query');
+    if (saved) {
+      searchInput.value = saved;
+      doSearch();
+    }
+  } catch (e) {}
+
   // Bắt phím Enter trên bàn phím iOS
   searchInput.addEventListener('keydown', function (e) {
     if (e.keyCode === 13) {
-      searchInput.blur(); // đóng bàn phím
+      searchInput.blur();
       doSearch();
     }
   });
@@ -43,6 +47,7 @@ var apiBanner    = document.getElementById('api-banner');
 function doSearch() {
   var query = searchInput.value.trim();
   if (!query) return;
+  try { sessionStorage.setItem('ytb_query', query); } catch (e) {}
 
   if (API_KEY === 'YOUR_API_KEY_HERE') {
     showError('Chưa có API Key!\nThêm key vào biến API_KEY trong file app.js\nXem hướng dẫn tại: console.cloud.google.com');
@@ -152,73 +157,17 @@ function onResultClick(e) {
 }
 
 // ============================================================
-//  PHÁT VIDEO
+//  PHÁT VIDEO — điều hướng sang player.html (trang riêng biệt)
 //
-//  Tạo iframe MỚI mỗi lần play — không reuse iframe cũ.
-//  Lý do: YouTube player khởi tạo size khi iframe mount vào DOM.
-//  Nếu reuse, size đã bị lock từ lần trước và không thay đổi được.
-//
-//  Thêm webkit-playsinline cho iOS 9 (cần attribute, không chỉ URL param).
+//  Lý do dùng trang riêng: iframe trong SPA bị ảnh hưởng bởi CSS parent
+//  và không có full viewport. player.html có viewport sạch, không có CSS
+//  nào gây nhiễu, YouTube player hoạt động đúng kích thước.
 // ============================================================
 function playVideo(videoId, title, channel) {
-  var screenW  = window.innerWidth;
-  var screenH  = Math.round(screenW * 9 / 16);
-
-  // Hiển thị info
-  videoInfoDiv.innerHTML =
-    '<h2>' + escHtml(title) + '</h2>' +
-    '<div class="video-channel">' + escHtml(channel) + '</div>';
-
-  // Chuyển màn hình
-  screenSearch.classList.remove('active');
-  screenPlayer.classList.add('active');
-  window.scrollTo(0, 0);
-
-  // Cấu hình container
-  var wrap = document.querySelector('.player-wrap');
-  wrap.style.width    = screenW + 'px';
-  wrap.style.height   = screenH + 'px';
-  wrap.style.overflow = 'hidden';
-
-  // Tạo iframe mới với đúng kích thước từ đầu
-  var iframe = document.createElement('iframe');
-  iframe.setAttribute('width',               String(screenW));
-  iframe.setAttribute('height',              String(screenH));
-  iframe.setAttribute('frameborder',         '0');
-  iframe.setAttribute('allowfullscreen',     'allowfullscreen');
-  iframe.setAttribute('webkit-allowfullscreen', '');  // iOS cũ cần attribute này
-  iframe.setAttribute('playsinline',         '');     // HTML attribute
-  iframe.setAttribute('webkit-playsinline', '');      // iOS 9 inline video
-  iframe.style.display = 'block';
-  iframe.style.width   = screenW + 'px';
-  iframe.style.height  = screenH + 'px';
-  iframe.style.border  = 'none';
-
-  // Xóa iframe cũ rồi gắn iframe mới
-  wrap.innerHTML = '';
-  wrap.appendChild(iframe);
-  ytPlayer = iframe;
-
-  // Set src SAU KHI iframe đã mount vào DOM với kích thước đúng
-  iframe.src = 'https://www.youtube.com/embed/' + videoId
-    + '?autoplay=1'
-    + '&playsinline=1'
-    + '&rel=0'
-    + '&modestbranding=1';
-}
-
-// ============================================================
-//  QUAY LẠI TÌM KIẾM
-// ============================================================
-function goBack() {
-  // Xóa hẳn iframe khỏi DOM để dừng video và giải phóng bộ nhớ
-  var wrap = document.querySelector('.player-wrap');
-  if (wrap) wrap.innerHTML = '';
-  ytPlayer = null;
-
-  screenPlayer.classList.remove('active');
-  screenSearch.classList.add('active');
-  window.scrollTo(0, 0);
+  window.location.href = 'player.html'
+    + '#v=' + encodeURIComponent(videoId)
+    + '&t=' + encodeURIComponent(title)
+    + '&c=' + encodeURIComponent(channel);
 }
 
 // ============================================================
