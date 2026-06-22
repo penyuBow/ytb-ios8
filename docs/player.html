@@ -10,18 +10,12 @@
     * { margin: 0; padding: 0; -webkit-box-sizing: border-box; box-sizing: border-box; }
     html, body { background: #000; font-family: -apple-system, 'Helvetica Neue', sans-serif; }
 
-    .header {
-      background: #111; padding: 10px 14px;
-      border-bottom: 1px solid #222; overflow: hidden;
-    }
-    .back-btn {
-      color: #fff; background: none; border: none; font-size: 16px;
-      -webkit-appearance: none; padding: 6px 0; cursor: pointer; float: left;
-    }
+    .header { background: #111; padding: 10px 14px; border-bottom: 1px solid #222; overflow: hidden; }
+    .back-btn { color: #fff; background: none; border: none; font-size: 16px; -webkit-appearance: none; padding: 6px 0; cursor: pointer; float: left; }
     .back-btn:active { color: #aaa; }
     .ver { color: #444; font-size: 11px; float: right; line-height: 32px; }
 
-    /* ===== THUMBNAIL ===== */
+    /* ===== POSTER ===== */
     #poster { width: 100%; background: #111; position: relative; cursor: pointer; display: block; }
     #poster img { display: block; width: 100%; height: auto; }
     .play-circle {
@@ -30,27 +24,43 @@
       background: rgba(200,0,0,0.92); border-radius: 50%; -webkit-border-radius: 50%;
       text-align: center; line-height: 72px; font-size: 30px; color: #fff;
     }
+    .poster-note { text-align: center; padding: 8px 16px 12px; color: #555; font-size: 12px; background: #111; }
+
+    /* ===== LOADING ===== */
+    #loading { display: none; padding: 46px 20px; text-align: center; background: #000; }
+    .spinner {
+      width: 36px; height: 36px; margin: 0 auto 14px;
+      border: 3px solid #333; border-top-color: #ff0000;
+      border-radius: 50%; -webkit-border-radius: 50%;
+      -webkit-animation: spin .8s linear infinite; animation: spin .8s linear infinite;
+    }
+    @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: #888; font-size: 13px; }
+
+    /* ===== NATIVE VIDEO ===== */
+    #video-wrap { display: none; width: 100%; background: #000; }
+    #video-wrap video { display: block; width: 100%; height: auto; background: #000; }
 
     /* ===== INFO ===== */
-    .video-info { padding: 16px; background: #111; border-bottom: 1px solid #222; }
-    .video-title { color: #fff; font-size: 16px; font-weight: 600; line-height: 1.45; margin-bottom: 6px; }
+    .video-info { padding: 14px 16px; background: #111; border-top: 1px solid #222; }
+    .video-title { color: #fff; font-size: 15px; font-weight: 600; line-height: 1.45; margin-bottom: 6px; }
     .video-channel { color: #aaa; font-size: 13px; }
 
-    /* ===== BUTTONS ===== */
-    .actions { padding: 18px 16px 8px; }
+    /* ===== FALLBACK BUTTONS ===== */
+    .actions { padding: 14px 16px 4px; }
     .btn {
-      display: block; width: 100%; margin-bottom: 12px; padding: 15px;
+      display: block; width: 100%; margin-bottom: 10px; padding: 14px;
       text-align: center; border-radius: 9px; -webkit-border-radius: 9px;
-      font-size: 16px; font-weight: 600; text-decoration: none;
+      font-size: 15px; font-weight: 600; text-decoration: none;
       -webkit-appearance: none; border: none; cursor: pointer;
     }
-    .btn-primary  { background: #cc0000; color: #fff; }
+    .btn-primary { background: #cc0000; color: #fff; }
     .btn-primary:active { background: #aa0000; }
     .btn-secondary { background: #222; color: #fff; border: 1px solid #333; }
-    .btn-secondary:active { background: #2c2c2c; }
-
-    .hint { color: #555; font-size: 12px; text-align: center; padding: 6px 24px 20px; line-height: 1.5; }
-
+    .yt-note { color: #555; font-size: 12px; text-align: center; padding: 2px 16px 16px; }
+    .err-msg { color: #ff8888; font-size: 13px; text-align: center; padding: 0 16px 12px; }
+    .hidden { display: none !important; }
     .err { color: #ff6666; padding: 40px 20px; text-align: center; }
   </style>
 </head>
@@ -58,36 +68,49 @@
 
 <div class="header">
   <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
-  <span class="ver">v12</span>
+  <span class="ver">v13</span>
 </div>
 
-<!-- Thumbnail (bấm = mở YouTube) -->
 <a id="poster" href="#">
   <img id="thumb" src="" alt="">
   <div class="play-circle">&#9654;</div>
 </a>
+<p class="poster-note" id="poster-note">Nh&#7845;n &#7843;nh &#273;&#7875; xem video</p>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>&#272;ang t&#7843;i video&#8230;</p>
+</div>
+
+<div id="video-wrap"></div>
 
 <div id="video-info" class="video-info"></div>
 
-<div class="actions" id="actions">
-  <a id="btn-app" class="btn btn-primary" href="#">&#9654; M&#7903; trong app YouTube</a>
-  <a id="btn-web" class="btn btn-secondary" href="#" target="_self">M&#7903; tr&#234;n web (Safari)</a>
+<p id="err-msg" class="err-msg hidden"></p>
+
+<!-- Nút dự phòng — chỉ hiện khi player in-app lỗi hoặc chưa cấu hình Worker -->
+<div class="actions hidden" id="actions">
+  <a id="btn-web" class="btn btn-primary" href="#" target="_self">&#9654; M&#7903; tr&#234;n YouTube</a>
 </div>
-<p class="hint">
-  N&#7871;u c&#243; app YouTube, n&#250;t &#273;&#7887; m&#7903; th&#7859;ng app (m&#432;&#7907;t nh&#7845;t).<br>
-  Ch&#432;a c&#243; app th&#236; d&#249;ng n&#250;t &#8220;M&#7903; tr&#234;n web&#8221;.
-</p>
+<p class="yt-note hidden" id="yt-note">Player in-app ch&#432;a s&#7861;n s&#224;ng &#8212; m&#7903; t&#7841;m tr&#234;n YouTube</p>
 
 <script>
+  // ============================================================
+  //  CẤU HÌNH — dán địa chỉ Cloudflare Worker vào đây.
+  //  Vd: 'https://ytb-proxy.tencuaban.workers.dev'
+  //  Để trống '' thì app sẽ chỉ hiện nút mở YouTube.
+  // ============================================================
+  var WORKER_BASE = '';
+
+  var LOAD_TIMEOUT = 12000; // ms — chờ video bắt đầu phát trước khi báo lỗi
+
   var params = {};
   try {
     var hash = window.location.hash.slice(1);
     var parts = hash.split('&');
     for (var i = 0; i < parts.length; i++) {
       var kv = parts[i].split('=');
-      if (kv.length >= 2) {
-        params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join('='));
-      }
+      if (kv.length >= 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join('='));
     }
   } catch (e) {}
 
@@ -95,8 +118,7 @@
   var title   = params.t || '';
   var channel = params.c || '';
 
-  var WEB_URL = 'https://m.youtube.com/watch?v=' + videoId;
-  var APP_URL = 'youtube://watch?v=' + videoId;   // mở app YouTube (nếu đã cài)
+  var videoEl = null, timer = null, done = false;
 
   if (!videoId) {
     document.body.innerHTML =
@@ -105,41 +127,77 @@
   } else {
     document.getElementById('thumb').src =
       'https://img.youtube.com/vi/' + videoId + '/hqdefault.jpg';
-
     document.getElementById('video-info').innerHTML =
       '<div class="video-title">' + esc(title) + '</div>' +
       '<div class="video-channel">' + esc(channel) + '</div>';
+    document.getElementById('btn-web').href = 'https://m.youtube.com/watch?v=' + videoId;
 
-    document.getElementById('btn-web').href = WEB_URL;
-    document.getElementById('btn-app').onclick = openApp;
-    document.getElementById('poster').onclick  = openApp;
+    if (WORKER_BASE) {
+      document.getElementById('poster').onclick = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        startPlay();
+        return false;
+      };
+    } else {
+      // Chưa cấu hình Worker → hiện nút YouTube luôn
+      showFallback(false);
+      document.getElementById('poster').onclick = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        window.location.href = 'https://m.youtube.com/watch?v=' + videoId;
+        return false;
+      };
+    }
   }
 
-  // Mở app YouTube; nếu sau ~1.5s vẫn còn ở trang này (chưa cài app) thì
-  // tự chuyển sang web. Đây là mẫu deep-link fallback chuẩn cho iOS.
-  function openApp(e) {
-    if (e && e.preventDefault) e.preventDefault();
+  function startPlay() {
+    document.getElementById('poster').style.display = 'none';
+    document.getElementById('poster-note').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
 
-    var t = Date.now();
-    var fallback = setTimeout(function () {
-      // Nếu trang vẫn hiển thị (app không mở được) => mở web
-      if (Date.now() - t < 2100 && !document.hidden) {
-        window.location.href = WEB_URL;
-      }
-    }, 1500);
+    videoEl = document.createElement('video');
+    videoEl.setAttribute('controls', 'controls');
+    videoEl.setAttribute('playsinline', '');
+    videoEl.setAttribute('webkit-playsinline', '');
+    videoEl.setAttribute('preload', 'auto');
+    videoEl.setAttribute('poster', 'https://img.youtube.com/vi/' + videoId + '/hqdefault.jpg');
+    videoEl.onerror = onFail;
+    videoEl.oncanplay = videoEl.onloadeddata = onReady;
+    document.getElementById('video-wrap').appendChild(videoEl);
 
-    // Nếu app mở, trang bị ẩn => huỷ fallback để không nhảy web khi quay lại
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) clearTimeout(fallback);
-    });
+    timer = setTimeout(onFail, LOAD_TIMEOUT);
+    videoEl.src = WORKER_BASE.replace(/\/$/, '') + '/?v=' + encodeURIComponent(videoId);
+    videoEl.load();
+  }
 
-    window.location.href = APP_URL;
-    return false;
+  function onReady() {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('video-wrap').style.display = 'block';
+    try { videoEl.play(); } catch (e) {}
+  }
+
+  function onFail() {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    document.getElementById('loading').style.display = 'none';
+    showFallback(true);
+  }
+
+  function showFallback(isError) {
+    document.getElementById('actions').className = 'actions';
+    document.getElementById('yt-note').className = 'yt-note';
+    if (isError) {
+      var m = document.getElementById('err-msg');
+      m.innerHTML = 'Kh&#244;ng t&#7843;i &#273;&#432;&#7907;c video in-app. M&#7903; t&#7841;m tr&#234;n YouTube b&#234;n d&#432;&#7899;i.';
+      m.className = 'err-msg';
+    }
   }
 
   function esc(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 </script>
