@@ -46,16 +46,12 @@
     }
     @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading p { color: #888; font-size: 13px; }
+    #loading-text { color: #888; font-size: 13px; margin-bottom: 6px; }
+    #loading-sub  { color: #555; font-size: 11px; }
 
-    /* ===== NATIVE HTML5 VIDEO =====
-       Thẻ <video> thuần là thứ DUY NHẤT chạy mượt trên iOS 8/9.
-       Không dùng iframe embed (Piped/YouTube) vì các trang đó cần
-       JavaScript hiện đại mà Safari iOS cũ không chạy được → kẹt loading. */
+    /* ===== NATIVE HTML5 VIDEO ===== */
     #video-wrap { display: none; width: 100%; background: #000; }
-    #video-wrap video {
-      display: block; width: 100%; height: auto; background: #000;
-    }
+    #video-wrap video { display: block; width: 100%; height: auto; background: #000; }
 
     /* ===== FALLBACK ===== */
     .yt-btn {
@@ -81,7 +77,7 @@
 
 <div class="header">
   <button class="back-btn" onclick="history.back()">&#8592; Quay l&#7841;i</button>
-  <span class="ver">v10</span>
+  <span class="ver">v11</span>
 </div>
 
 <!-- Poster thumbnail -->
@@ -94,15 +90,16 @@
 <!-- Loading spinner -->
 <div id="loading">
   <div class="spinner"></div>
-  <p id="loading-text">&#272;ang t&#7843;i video...</p>
+  <p id="loading-text">&#272;ang k&#7871;t n&#7889;i&#8230;</p>
+  <p id="loading-sub"></p>
 </div>
 
-<!-- Native HTML5 video — tạo bằng JS sau khi có stream URL -->
+<!-- Native HTML5 video -->
 <div id="video-wrap"></div>
 
 <div id="video-info" class="video-info"></div>
 
-<!-- Nút dự phòng m.youtube.com — luôn hiển thị -->
+<!-- Nút dự phòng — luôn hiển thị -->
 <a id="yt-btn" class="yt-btn" href="" target="_self">
   &#9654; M&#7903; tr&#234;n YouTube (d&#7921; ph&#242;ng)
 </a>
@@ -110,23 +107,23 @@
 <p id="err-msg" class="err-msg hidden"></p>
 
 <script>
-  // Danh sách Invidious instances — sẽ thử lần lượt nếu cái trước fail.
-  // Dùng endpoint /latest_version?id=...&itag=...&local=true:
-  //   - local=true => stream được proxy QUA instance (tránh lỗi 403
-  //     do googlevideo khoá theo IP), và trả về MP4 thuần.
-  //   - itag 18 = 360p mp4 (audio+video), itag 22 = 720p mp4.
-  //   - <video> nạp trực tiếp URL này, KHÔNG cần gọi API/CORS.
+  // Danh sách instances — gọi API (/api/v1/videos) để lấy URL stream trực tiếp.
+  // Khác với v10 (dùng /latest_version proxy), cách này lấy URL CDN YouTube
+  // rồi <video> kết nối thẳng tới CDN — không cần instance proxy bandwidth.
+  // Instances được sắp xếp: Asia trước (gần Vietnam hơn), sau đó Europe/US.
   var INSTANCES = [
-    'https://yewtu.be',
     'https://inv.nadeko.net',
+    'https://invidious.jing.rocks',
+    'https://yewtu.be',
     'https://iv.ggtyler.dev',
     'https://invidious.nerdvpn.de',
-    'https://invidious.jing.rocks',
-    'https://invidious.privacyredirect.com'
+    'https://invidious.privacyredirect.com',
+    'https://yt.cdaut.de',
+    'https://invidious.perennialte.ch'
   ];
-  var ITAGS = ['18', '22']; // 360p trước (nhẹ, dễ phát trên máy cũ), rồi 720p
 
-  var PER_TRY_TIMEOUT = 9000; // ms — mỗi ứng viên chờ tối đa 9s rồi bỏ qua
+  var XHR_TIMEOUT  = 7000; // ms chờ API phản hồi
+  var VID_TIMEOUT  = 8000; // ms chờ video bắt đầu phát sau khi có URL
 
   var params = {};
   try {
@@ -144,11 +141,10 @@
   var title   = params.t || '';
   var channel = params.c || '';
 
-  // Danh sách URL ứng viên (instance x itag)
-  var candidates = [];
-  var candIdx = 0;
-  var tryTimer = null;
-  var videoEl = null;
+  var instIdx   = 0;
+  var videoEl   = null;
+  var vidTimer  = null;
+  var done      = false;
 
   if (!videoId) {
     document.getElementById('poster').innerHTML =
@@ -165,87 +161,124 @@
     document.getElementById('yt-btn').href =
       'https://m.youtube.com/watch?v=' + videoId;
 
-    // Build danh sách ứng viên: ưu tiên 360p ở tất cả instance, rồi 720p.
-    for (var t = 0; t < ITAGS.length; t++) {
-      for (var s = 0; s < INSTANCES.length; s++) {
-        candidates.push(
-          INSTANCES[s] + '/latest_version?id=' + encodeURIComponent(videoId) +
-          '&itag=' + ITAGS[t] + '&local=true'
-        );
-      }
-    }
-
     document.getElementById('poster').onclick = startLoad;
   }
 
+  // ─── Bắt đầu tải ───────────────────────────────────────────
   function startLoad() {
-    document.getElementById('poster').style.display = 'none';
+    document.getElementById('poster').style.display      = 'none';
     document.getElementById('poster-note').style.display = 'none';
-    document.getElementById('loading').style.display = 'block';
+    document.getElementById('loading').style.display     = 'block';
 
-    // Tạo 1 thẻ video tái sử dụng cho mọi lần thử
     var wrap = document.getElementById('video-wrap');
     videoEl = document.createElement('video');
-    videoEl.setAttribute('controls', 'controls');
-    videoEl.setAttribute('playsinline', '');          // iOS 10+
-    videoEl.setAttribute('webkit-playsinline', '');    // iOS 8/9
-    videoEl.setAttribute('preload', 'auto');
+    videoEl.setAttribute('controls',            'controls');
+    videoEl.setAttribute('playsinline',         '');
+    videoEl.setAttribute('webkit-playsinline',  '');
+    videoEl.setAttribute('preload',             'auto');
     videoEl.setAttribute('poster',
       'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg');
-
-    videoEl.onerror = function () { nextCandidate(); };
-    // Khi đã sẵn sàng phát => coi như thành công
-    videoEl.oncanplay   = onPlayable;
-    videoEl.onloadeddata = onPlayable;
-
+    videoEl.onerror      = onVideoFail;
+    videoEl.oncanplay    = onVideoReady;
+    videoEl.onloadeddata = onVideoReady;
     wrap.appendChild(videoEl);
 
-    candIdx = 0;
-    tryCandidate();
+    tryNextInstance();
   }
 
-  function tryCandidate() {
-    if (candIdx >= candidates.length) { fail(); return; }
+  // ─── Gọi Invidious API để lấy URL stream ──────────────────
+  function tryNextInstance() {
+    if (instIdx >= INSTANCES.length) { allFailed(); return; }
 
-    clearTimeout(tryTimer);
-    tryTimer = setTimeout(nextCandidate, PER_TRY_TIMEOUT);
+    setStatus(
+      '&#272;ang k&#7871;t n&#7889;i&#8230; (' + (instIdx + 1) + '/' + INSTANCES.length + ')',
+      INSTANCES[instIdx].replace('https://', '')
+    );
 
-    var url = candidates[candIdx];
+    var xhr = new XMLHttpRequest();
+    var url = INSTANCES[instIdx] + '/api/v1/videos/' + videoId
+              + '?fields=formatStreams';
+    xhr.open('GET', url, true);
+    xhr.timeout = XHR_TIMEOUT;
+
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status === 200) {
+        try {
+          var data   = JSON.parse(xhr.responseText);
+          var stream = pickStream(data.formatStreams || []);
+          if (stream) { tryPlayUrl(stream.url); return; }
+        } catch (e) {}
+      }
+      instIdx++;
+      tryNextInstance();
+    };
+    xhr.ontimeout = xhr.onerror = function () { instIdx++; tryNextInstance(); };
+    xhr.send();
+  }
+
+  // ─── Chọn stream tốt nhất: 360p mp4 trước (nhẹ, iOS cũ đọc được) ──
+  function pickStream(streams) {
+    var order = ['18', '22', '17', '36', '5'];  // itag 18=360p, 22=720p
+    for (var p = 0; p < order.length; p++) {
+      for (var s = 0; s < streams.length; s++) {
+        var st = streams[s];
+        var itag = String(st.itag || '');
+        if (itag === order[p]) return st;
+      }
+    }
+    // Fallback: bất kỳ mp4 nào
+    for (var s = 0; s < streams.length; s++) {
+      if (streams[s].container === 'mp4') return streams[s];
+    }
+    return null;
+  }
+
+  // ─── Thử phát URL stream, timeout nếu không khởi động được ─
+  function tryPlayUrl(url) {
+    clearTimeout(vidTimer);
+    vidTimer = setTimeout(onVideoFail, VID_TIMEOUT);
+
+    setStatus('&#272;ang t&#7843;i video&#8230;', '');
     try {
       videoEl.src = url;
       videoEl.load();
-    } catch (e) {
-      nextCandidate();
-    }
+    } catch (e) { onVideoFail(); }
   }
 
-  function nextCandidate() {
-    clearTimeout(tryTimer);
-    candIdx++;
-    tryCandidate();
+  function onVideoFail() {
+    clearTimeout(vidTimer);
+    if (done) return;
+    try { videoEl.src = ''; } catch (e) {}
+    instIdx++;
+    tryNextInstance();
   }
 
-  var done = false;
-  function onPlayable() {
+  function onVideoReady() {
     if (done) return;
     done = true;
-    clearTimeout(tryTimer);
+    clearTimeout(vidTimer);
 
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('video-wrap').style.display = 'block';
-
+    document.getElementById('loading').style.display     = 'none';
+    document.getElementById('video-wrap').style.display  = 'block';
     try { videoEl.play(); } catch (e) {}
   }
 
-  function fail() {
-    clearTimeout(tryTimer);
+  // ─── Tất cả thất bại ────────────────────────────────────────
+  function allFailed() {
+    clearTimeout(vidTimer);
     document.getElementById('loading').style.display = 'none';
     var msg = document.getElementById('err-msg');
     msg.innerHTML =
-      'Kh&#244;ng t&#7843;i &#273;&#432;&#7907;c video qua m&#225;y ch&#7911; ' +
-      'd&#7921; ph&#242;ng. H&#227;y nh&#7845;n n&#250;t &#273;&#7887; ' +
-      'm&#7903; tr&#234;n YouTube.';
+      'Kh&#244;ng l&#7845;y &#273;&#432;&#7907;c stream. ' +
+      'H&#227;y nh&#7845;n n&#250;t &#273;&#7887; m&#7903; tr&#234;n YouTube.';
     msg.className = 'err-msg';
+  }
+
+  // ─── Helpers ────────────────────────────────────────────────
+  function setStatus(main, sub) {
+    document.getElementById('loading-text').innerHTML = main;
+    document.getElementById('loading-sub').innerHTML  = sub;
   }
 
   function esc(s) {
